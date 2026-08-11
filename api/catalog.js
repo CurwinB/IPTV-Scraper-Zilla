@@ -32,6 +32,7 @@ export default async function handler(req, res) {
         country: c.country || '',
         language: c.language || '',
         group: c.group || '',
+        category: c.category || '',
         url: c.url,
         sourceCount: Number(c.sourceCount) || (Array.isArray(c.sources) ? c.sources.length : 1),
         sources: Array.isArray(c.sources)
