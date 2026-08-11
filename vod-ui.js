@@ -23,3 +23,4 @@
   more.addEventListener('click',e=>{if(!['movie','tv','anime'].includes(state.mode))return;e.stopImmediatePropagation();state.page+=1;load(false)},true);
   setMode('movie');
 })();
+const bouyonPlayerScript=document.createElement('script');bouyonPlayerScript.src='/player-fix.js?v=2';document.head.appendChild(bouyonPlayerScript);
