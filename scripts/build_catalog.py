@@ -6,18 +6,21 @@ import requests
 ROOT=Path(__file__).resolve().parents[1]; DATA=ROOT/'data'; DATA.mkdir(exist_ok=True)
 UA='BouyonTV/1.0'; GH={'User-Agent':UA,'Accept':'application/vnd.github+json'}
 
-# Discover playlist files from each repo using one Git tree request. This avoids
-# recursive Contents-API calls and prevents rate-limit/empty-catalog failures.
-def playlist_urls(repo, ref='master', prefix=''):
-    r=requests.get(f'https://api.github.com/repos/{repo}/git/trees/{ref}?recursive=1',headers=GH,timeout=60)
-    r.raise_for_status(); tree=r.json().get('tree',[])
-    urls=[]
+def playlist_urls_for(repo,ref,prefix=''):
+    r=requests.get(f'https://api.github.com/repos/{repo}/git/trees/{ref}?recursive=1',headers=GH,timeout=60); r.raise_for_status(); tree=r.json().get('tree',[])
+    out=[]
     for item in tree:
         p=item.get('path','')
         if item.get('type')!='blob' or not re.search(r'\.(m3u8?|txt)$',p,re.I): continue
         if prefix and not p.lower().startswith(prefix.lower().rstrip('/')+'/'): continue
-        urls.append(f'https://raw.githubusercontent.com/{repo}/{ref}/{p}')
-    return urls
+        out.append(f'https://raw.githubusercontent.com/{repo}/{ref}/{p}')
+    return out
+
+def clean_name(name):
+    name=re.sub(r'\s+',' ',name or '').strip()
+    name=re.sub(r'^[-–—_\s]+','',name)
+    name=re.sub(r'^\s*\d+\s*(?:,|:|\|)\s*','',name)
+    return name.strip(' ,|-') or 'Unknown'
 
 def parse(text,source):
     rows=[]; meta=None
@@ -27,9 +30,8 @@ def parse(text,source):
             p=t.find(','); h=t if p<0 else t[:p]; name='' if p<0 else t[p+1:].strip()
             def a(k):
                 m=re.search(rf'{re.escape(k)}="([^"]*)"',h,re.I); return m.group(1).strip() if m else ''
-            meta={'id':a('tvg-id'),'name':name,'logo':a('tvg-logo'),'group':a('group-title'),'country':a('tvg-country'),'language':a('tvg-language'),'source':source}
-        elif meta and re.match(r'^https?://',t,re.I):
-            rows.append({**meta,'url':t}); meta=None
+            meta={'id':a('tvg-id'),'name':clean_name(name),'logo':a('tvg-logo'),'group':a('group-title'),'country':a('tvg-country'),'language':a('tvg-language'),'source':source}
+        elif meta and re.match(r'^https?://',t,re.I): rows.append({**meta,'url':t}); meta=None
     return rows
 
 def load(url):
@@ -37,8 +39,7 @@ def load(url):
         r=requests.get(url,headers={'User-Agent':UA},timeout=30); r.raise_for_status()
         if len(r.content)>8_000_000: return []
         return parse(r.text,url)
-    except Exception as e:
-        print('playlist failed:',url,e); return []
+    except Exception as e: print('playlist failed:',url,e); return []
 
 def check(r):
     start=time.monotonic()
@@ -60,17 +61,13 @@ def check(r):
 def main():
     playlist_urls=[]
     for repo,ref,prefix in [('CurwinB/iptv','master','streams'),('CurwinB/IPTV-Scraper-Zilla','main','')]:
-        found=playlist_urls_for(repo,ref,prefix)
-        print(f'{repo}: {len(found)} playlists found')
-        playlist_urls += found
-    playlist_urls=list(dict.fromkeys(playlist_urls))
-    print('TOTAL PLAYLISTS:',len(playlist_urls))
+        found=playlist_urls_for(repo,ref,prefix); print(f'{repo}: {len(found)} playlists found'); playlist_urls += found
+    playlist_urls=list(dict.fromkeys(playlist_urls)); print('TOTAL PLAYLISTS:',len(playlist_urls))
     if not playlist_urls: raise SystemExit('ERROR: no playlists discovered')
     rows=[]
     with ThreadPoolExecutor(max_workers=12) as pool:
         for batch in pool.map(load,playlist_urls): rows += batch
-    unique={r['url']:r for r in rows if r.get('url')}
-    print('RAW STREAMS:',len(rows)); print('UNIQUE URLS:',len(unique))
+    unique={r['url']:r for r in rows if r.get('url')}; print('RAW STREAMS:',len(rows)); print('UNIQUE URLS:',len(unique))
     if not unique: raise SystemExit('ERROR: playlists contained zero stream URLs')
     healthy=[]
     with ThreadPoolExecutor(max_workers=48) as pool:
@@ -81,7 +78,7 @@ def main():
     print('HEALTHY URLS:',len(healthy))
     channels={}
     for r in healthy:
-        name=re.sub(r'\s+',' ',r.get('name') or r.get('id') or 'Unknown').strip()
+        name=clean_name(r.get('name') or r.get('id'))
         key=(re.sub(r'[^a-z0-9]+','',name.lower()),r.get('country','').lower(),r.get('language','').lower())
         c=channels.setdefault(key,{'id':r.get('id') or key[0],'name':name,'logo':r.get('logo',''),'country':r.get('country',''),'language':r.get('language',''),'group':r.get('group',''),'sources':[]})
         if not c['logo'] and r.get('logo'): c['logo']=r['logo']
@@ -94,15 +91,5 @@ def main():
     payload={'version':3,'updatedAt':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'count':len(output),'checkedUrls':len(unique),'healthyUrls':len(healthy),'channels':output}
     (DATA/'catalog.json').write_text(json.dumps(payload,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
     print(f'PLAYABLE CHANNELS: {len(output)}')
-
-def playlist_urls_for(repo,ref,prefix):
-    r=requests.get(f'https://api.github.com/repos/{repo}/git/trees/{ref}?recursive=1',headers=GH,timeout=60); r.raise_for_status(); tree=r.json().get('tree',[])
-    out=[]
-    for item in tree:
-        p=item.get('path','')
-        if item.get('type')!='blob' or not re.search(r'\.(m3u8?|txt)$',p,re.I): continue
-        if prefix and not p.lower().startswith(prefix.lower().rstrip('/')+'/'): continue
-        out.append(f'https://raw.githubusercontent.com/{repo}/{ref}/{p}')
-    return out
 
 if __name__=='__main__': main()
