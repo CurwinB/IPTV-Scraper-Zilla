@@ -2,7 +2,7 @@ const API = 'https://api.themoviedb.org/3';
 function endpoint(type, id, season) {
   if (type === 'search') return `/search/multi?query=${encodeURIComponent(id)}&include_adult=false&page=1`;
   if (type === 'movie') return `/movie/${encodeURIComponent(id)}?append_to_response=credits`;
-  if (type === 'tv') return `/tv/${encodeURIComponent(id)}?append_to_response=credits`;
+  if (type === 'tv' || type === 'tv-details') return `/tv/${encodeURIComponent(id)}?append_to_response=credits`;
   if (type === 'season') return `/tv/${encodeURIComponent(id)}/season/${encodeURIComponent(season)}`;
   if (type === 'trending') return '/trending/all/week';
   if (type === 'popular-movies') return '/movie/popular?page=1';
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   if (!token) return res.status(503).json({ error: 'TMDB is not configured. Add TMDB_READ_TOKEN to Vercel.' });
   const type = String(req.query?.type || 'trending'), id = req.query?.id, season = req.query?.season;
   const path = endpoint(type, id, season);
-  if (!path || (['search','movie','tv','season'].includes(type) && !id)) return res.status(400).json({ error: 'Invalid TMDB request' });
+  if (!path || (['search','movie','tv','tv-details','season'].includes(type) && !id)) return res.status(400).json({ error: 'Invalid TMDB request' });
   try {
     const r = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } });
     const data = await r.json();
