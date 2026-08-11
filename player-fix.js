@@ -1,5 +1,17 @@
 // BouyonTV player hardening: isolated Live TV playback with automatic source failover.
+// CineXtream is centralized here as a defensive runtime override for the legacy inline player.
 (() => {
+  const CINE='https://cinextream.cc';
+  window.BOUYONTV_CINEXTREAM_BASE=CINE;
+  window.BouyonTVCineXtream=window.BouyonTVCineXtream||{
+    movie:id=>`${CINE}/api/embed/movie/${encodeURIComponent(id)}`,
+    tv:(id,s=1,e=1)=>`${CINE}/api/embed/tv/${encodeURIComponent(id)}/${encodeURIComponent(s)}/${encodeURIComponent(e)}`,
+    anime:(id,e=1)=>`${CINE}/api/embed/anime/lang/${encodeURIComponent(id)}/${encodeURIComponent(e)}`
+  };
+  // index.html historically exposed cineUrl globally. Replace it at runtime so legacy
+  // Movie/TV controls cannot continue constructing .net URLs.
+  window.cineUrl=(type,id,s=1,e=1)=>type==='tv'?window.BouyonTVCineXtream.tv(id,s,e):window.BouyonTVCineXtream.movie(id);
+
   const video=document.getElementById('video'),player=document.getElementById('player'),vod=document.getElementById('vod'),frame=document.getElementById('frame'),title=document.getElementById('title'),status=document.getElementById('status');
   if(!video||!player||!vod||!frame)return;
   let hls=null,sources=[],sourceIndex=0,channels=[];
