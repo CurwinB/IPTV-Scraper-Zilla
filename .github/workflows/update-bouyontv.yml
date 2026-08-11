@@ -8,12 +8,18 @@ on:
 permissions:
   contents: write
 
+env:
+  CATALOG: data/catalog.json
+
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout BouyonTV
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -28,45 +34,49 @@ jobs:
 
       - name: Validate generated catalogue
         run: |
-          test -s data/catalog.json
+          set -euo pipefail
+          test -s "$CATALOG"
           python - <<'PY'
           import json
           from pathlib import Path
-          p = Path('data/catalog.json')
-          data = json.loads(p.read_text())
-          channels = data.get('channels')
-          assert isinstance(channels, list) and len(channels) > 0, 'catalog.json contains zero channels'
-          assert data.get('count') == len(channels), 'catalog count does not match channels array'
-          assert data.get('healthyUrls', 0) > 0, 'catalog contains zero healthy URLs'
-          print(f"Catalogue verified: {len(channels)} playable channels / {data.get('healthyUrls')} healthy URLs")
+          p=Path('data/catalog.json')
+          d=json.loads(p.read_text(encoding='utf-8'))
+          channels=d.get('channels')
+          if not isinstance(channels,list) or not channels:
+              raise SystemExit('ERROR: generated catalogue has zero channels')
+          if d.get('count') != len(channels):
+              raise SystemExit('ERROR: catalogue count mismatch')
+          if int(d.get('healthyUrls',0)) <= 0:
+              raise SystemExit('ERROR: generated catalogue has zero healthy URLs')
+          print(f'GENERATED CATALOG OK: {len(channels)} channels / {d.get("healthyUrls")} healthy URLs / {p.stat().st_size} bytes')
           PY
 
-      - name: Show catalogue summary
-        run: |
-          python - <<'PY'
-          import json
-          d=json.load(open('data/catalog.json'))
-          print('Playlists/source build completed')
-          print('Checked URLs:', d.get('checkedUrls'))
-          print('Healthy URLs:', d.get('healthyUrls'))
-          print('Playable channels:', d.get('count'))
-          PY
+      - name: Upload generated catalogue artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bouyontv-catalog-${{ github.run_id }}
+          path: data/catalog.json
+          retention-days: 7
 
-      - name: Commit catalogue
+      - name: Commit catalogue with verified file
         run: |
+          set -euo pipefail
           git config user.name 'bouyontv-bot'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add data/catalog.json
           git diff --cached --quiet || git commit -m 'chore: refresh BouyonTV validated catalogue'
-          git push
+          git push origin HEAD:main
 
-      - name: Verify committed catalogue
+      - name: Verify repository file after push
         run: |
-          git show HEAD:data/catalog.json > /tmp/catalog.json
-          test -s /tmp/catalog.json
+          set -euo pipefail
+          git fetch origin main
+          git checkout --detach origin/main
+          test -s "$CATALOG"
           python - <<'PY'
           import json
-          d=json.load(open('/tmp/catalog.json'))
-          assert d.get('count', 0) > 0
-          print(f"Committed catalogue verified: {d['count']} channels")
+          d=json.load(open('data/catalog.json',encoding='utf-8'))
+          if not d.get('channels') or d.get('count',0) != len(d['channels']):
+              raise SystemExit('ERROR: repository catalogue verification failed')
+          print(f'REPOSITORY CATALOG OK: {d["count"]} channels / {d.get("healthyUrls",0)} healthy URLs')
           PY
