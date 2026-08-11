@@ -26,6 +26,32 @@ jobs:
       - name: Build validated catalogue
         run: python scripts/build_catalog.py
 
+      - name: Validate generated catalogue
+        run: |
+          test -s data/catalog.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('data/catalog.json')
+          data = json.loads(p.read_text())
+          channels = data.get('channels')
+          assert isinstance(channels, list) and len(channels) > 0, 'catalog.json contains zero channels'
+          assert data.get('count') == len(channels), 'catalog count does not match channels array'
+          assert data.get('healthyUrls', 0) > 0, 'catalog contains zero healthy URLs'
+          print(f"Catalogue verified: {len(channels)} playable channels / {data.get('healthyUrls')} healthy URLs")
+          PY
+
+      - name: Show catalogue summary
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('data/catalog.json'))
+          print('Playlists/source build completed')
+          print('Checked URLs:', d.get('checkedUrls'))
+          print('Healthy URLs:', d.get('healthyUrls'))
+          print('Playable channels:', d.get('count'))
+          PY
+
       - name: Commit catalogue
         run: |
           git config user.name 'bouyontv-bot'
@@ -33,3 +59,14 @@ jobs:
           git add data/catalog.json
           git diff --cached --quiet || git commit -m 'chore: refresh BouyonTV validated catalogue'
           git push
+
+      - name: Verify committed catalogue
+        run: |
+          git show HEAD:data/catalog.json > /tmp/catalog.json
+          test -s /tmp/catalog.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/catalog.json'))
+          assert d.get('count', 0) > 0
+          print(f"Committed catalogue verified: {d['count']} channels")
+          PY
