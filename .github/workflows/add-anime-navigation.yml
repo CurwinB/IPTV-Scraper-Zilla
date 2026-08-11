@@ -1,0 +1,53 @@
+name: Add BouyonTV Anime navigation
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  add-anime-navigation:
+    if: ${{ !contains(github.event.head_commit.message, '[anime-nav]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add Anime navigation
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # Desktop sidebar
+          old = '<button data-mode="tv">▤ &nbsp; TV Shows</button>'
+          new = old + '<button data-mode="anime">◈ &nbsp; Anime</button>'
+          if 'data-mode="anime">' not in s and old in s:
+              s = s.replace(old, new, 1)
+
+          # Mobile bottom navigation
+          old_mobile = '<button data-mode="tv">TV Shows</button>'
+          new_mobile = old_mobile + '<button data-mode="anime">Anime</button>'
+          if 'data-mode="anime">Anime</button>' not in s and old_mobile in s:
+              s = s.replace(old_mobile, new_mobile, 1)
+
+          # Give mobile nav five equal destinations.
+          s = s.replace('grid-template-columns:repeat(4,1fr)', 'grid-template-columns:repeat(5,1fr)', 1)
+
+          p.write_text(s, encoding='utf-8')
+
+      - name: Commit Anime navigation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "Anime navigation already present"
+            exit 0
+          fi
+          git commit -m "Add Anime navigation [anime-nav]"
+          git push
