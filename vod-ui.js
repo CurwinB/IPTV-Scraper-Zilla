@@ -1,4 +1,16 @@
 // BouyonTV VOD UI: Movies + TV Shows + Anime. Live TV is intentionally owned by index.html/player-fix.js.
+// Load the shared CineXtream runtime after the legacy inline player so its global cineUrl is replaced.
+(() => {
+  const CINE='https://cinextream.cc';
+  window.BOUYONTV_CINEXTREAM_BASE=CINE;
+  window.BouyonTVCineXtream=window.BouyonTVCineXtream||{
+    movie:id=>`${CINE}/api/embed/movie/${encodeURIComponent(id)}`,
+    tv:(id,s=1,e=1)=>`${CINE}/api/embed/tv/${encodeURIComponent(id)}/${encodeURIComponent(s)}/${encodeURIComponent(e)}`,
+    anime:(id,e=1)=>`${CINE}/api/embed/anime/lang/${encodeURIComponent(id)}/${encodeURIComponent(e)}`
+  };
+  window.cineUrl=(type,id,s=1,e=1)=>type==='tv'?window.BouyonTVCineXtream.tv(id,s,e):window.BouyonTVCineXtream.movie(id);
+  if(!document.querySelector('script[data-bouyon-player-fix]')){const p=document.createElement('script');p.src='/player-fix.js?v=4';p.dataset.bouyonPlayerFix='1';document.head.appendChild(p)}
+})();
 (() => {
   const $=id=>document.getElementById(id),search=$('search'),list=$('list'),more=$('more'),count=$('count'),filters=document.querySelector('.filters'),brand=document.querySelector('.brand');
   if(!search||!list||!brand)return;
