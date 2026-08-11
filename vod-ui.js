@@ -1,3 +1,4 @@
+// BouyonTV VOD UI integration
 (() => {
   const $ = (id) => document.getElementById(id);
   const state = { mode: 'live', page: 1, totalPages: 1, type: 'movie' };
@@ -10,144 +11,19 @@
   if (!search || !list || !brand) return;
 
   const style = document.createElement('style');
-  style.textContent = `
-    .vod-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 9px}
-    .vod-tab{border:1px solid #292929;background:#151515;color:#aaa;border-radius:8px;padding:8px 5px;font-weight:650}
-    .vod-tab.active{background:#eee;color:#050505;border-color:#eee}
-    .vod-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-    .vod-card{display:block;width:100%;border:0;background:transparent;color:#eee;text-align:left;padding:0;min-width:0}
-    .vod-poster{display:block;width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:7px;background:#151515}
-    .vod-title{font-size:12px;font-weight:650;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .vod-meta{font-size:10px;color:#777;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .vod-details{padding:12px 2px}.vod-details h2{margin:12px 0 5px;font-size:24px}.vod-details p{color:#aaa;line-height:1.5;font-size:13px}
-    .vod-back,.vod-season,.vod-episode{background:#151515;color:#ddd;border:1px solid #292929;border-radius:8px;padding:8px 10px}
-    .vod-seasons{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}.vod-season.active{background:#eee;color:#050505}
-    .vod-episodes{display:grid;gap:7px;margin-top:12px}.vod-episode{text-align:left}.vod-episode small{display:block;color:#888;margin-top:3px}
-    .vod-attribution{font-size:9px;color:#666;margin-top:10px;line-height:1.4}
-    @media(max-width:480px){.vod-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.vod-title{font-size:11px}}
-  `;
+  style.textContent = `.vod-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 9px}.vod-tab{border:1px solid #292929;background:#151515;color:#aaa;border-radius:8px;padding:8px 5px;font-weight:650}.vod-tab.active{background:#eee;color:#050505;border-color:#eee}.vod-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.vod-card{display:block;width:100%;border:0;background:transparent;color:#eee;text-align:left;padding:0;min-width:0}.vod-poster{display:block;width:100%;aspect-ratio:2/3;object-fit:cover;border-radius:7px;background:#151515}.vod-title{font-size:12px;font-weight:650;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vod-meta{font-size:10px;color:#777;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.vod-details{padding:12px 2px}.vod-details h2{margin:12px 0 5px;font-size:24px}.vod-details p{color:#aaa;line-height:1.5;font-size:13px}.vod-back,.vod-season,.vod-episode{background:#151515;color:#ddd;border:1px solid #292929;border-radius:8px;padding:8px 10px}.vod-seasons{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}.vod-season.active{background:#eee;color:#050505}.vod-episodes{display:grid;gap:7px;margin-top:12px}.vod-episode{text-align:left}.vod-episode small{display:block;color:#888;margin-top:3px}.vod-attribution{font-size:9px;color:#666;margin-top:10px;line-height:1.4}@media(max-width:480px){.vod-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.vod-title{font-size:11px}}`;
   document.head.appendChild(style);
-
-  const tabs = document.createElement('div');
-  tabs.className = 'vod-tabs';
-  tabs.innerHTML = '<button class="vod-tab active" data-mode="live">Live TV</button><button class="vod-tab" data-mode="movie">Movies</button><button class="vod-tab" data-mode="tv">TV Shows</button>';
-  brand.insertAdjacentElement('afterend', tabs);
-
-  function setStatus(text, error = false) {
-    const el = $('status');
-    if (el) { el.textContent = text; el.className = 'status' + (error ? ' error' : ''); }
-  }
-  function esc(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
-
-  function setMode(mode) {
-    state.mode = mode;
-    document.querySelectorAll('.vod-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-    if (filters) filters.style.display = mode === 'live' ? '' : 'none';
-    search.placeholder = mode === 'live' ? 'Search channels…' : mode === 'tv' ? 'Search TV shows…' : 'Search movies…';
-    search.value = '';
-    if (mode === 'live') {
-      more.hidden = false;
-      list.classList.remove('vod-grid');
-      list.classList.remove('vod-details');
-      if (typeof window.bouyonLiveReload === 'function') window.bouyonLiveReload();
-      else location.reload();
-      return;
-    }
-    state.type = mode;
-    state.page = 1;
-    list.className = 'list vod-grid';
-    list.replaceChildren();
-    loadVOD(true);
-  }
-
-  async function api(params) {
-    const qs = new URLSearchParams(params);
-    const r = await fetch('/api/vod?' + qs.toString(), { cache: 'no-store' });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'VOD unavailable');
-    return d;
-  }
-
-  function card(item) {
-    const b = document.createElement('button');
-    b.className = 'vod-card';
-    b.innerHTML = `<img class="vod-poster" loading="lazy" src="${esc(item.poster)}" onerror="this.style.visibility='hidden'"><div class="vod-title">${esc(item.title)}</div><div class="vod-meta">${esc(item.year)}${item.rating ? ` • ${Number(item.rating).toFixed(1)}` : ''}</div>`;
-    b.onclick = () => details(item);
-    return b;
-  }
-
-  async function loadVOD(reset) {
-    try {
-      const q = search.value.trim();
-      const action = q ? 'search' : 'popular';
-      setStatus(q ? 'Searching…' : 'Loading catalogue…');
-      const d = await api({ type: state.type, action, page: state.page, ...(q ? { q } : {}) });
-      state.totalPages = d.totalPages || 1;
-      count.textContent = `${Number(d.totalResults || d.results?.length || 0).toLocaleString()} results`;
-      if (reset) list.replaceChildren();
-      (d.results || []).forEach(x => list.appendChild(card(x)));
-      more.hidden = state.page >= state.totalPages || !(d.results || []).length;
-      setStatus(state.type === 'tv' ? 'TV Shows • TMDB catalogue' : 'Movies • TMDB catalogue');
-      if (!document.querySelector('.vod-attribution')) {
-        const a = document.createElement('div'); a.className = 'vod-attribution';
-        a.textContent = 'This product uses the TMDB API but is not endorsed or certified by TMDB.';
-        list.parentElement.appendChild(a);
-      }
-    } catch (e) {
-      count.textContent = 'VOD unavailable'; setStatus(e.message, true); more.hidden = true;
-    }
-  }
-
-  async function details(item) {
-    try {
-      const d = await api({ type: item.type === 'series' ? 'tv' : 'movie', action: 'details', id: item.tmdbId });
-      list.className = 'list'; list.replaceChildren(); more.hidden = true;
-      const box = document.createElement('div'); box.className = 'vod-details';
-      box.innerHTML = `<button class="vod-back">← Back</button><img class="vod-poster" style="max-width:180px;margin-top:12px" src="${esc(d.poster)}"><h2>${esc(d.title)}</h2><div class="vod-meta">${esc(d.year)}${d.rating ? ` • ${Number(d.rating).toFixed(1)}/10` : ''}</div><p>${esc(d.overview)}</p>`;
-      list.appendChild(box);
-      box.querySelector('.vod-back').onclick = () => { list.className = 'list vod-grid'; loadVOD(true); };
-      if (d.type === 'series') {
-        const seasons = document.createElement('div'); seasons.className = 'vod-seasons';
-        (d.seasons || []).forEach((s, i) => { const b = document.createElement('button'); b.className = 'vod-season' + (i === 0 ? ' active' : ''); b.textContent = s.name || `Season ${s.season}`; b.onclick = () => { seasons.querySelectorAll('button').forEach(x => x.classList.remove('active')); b.classList.add('active'); episodes(d, s.season, box); }; seasons.appendChild(b); });
-        box.appendChild(seasons);
-        if (d.seasons?.length) episodes(d, d.seasons[0].season, box);
-      } else {
-        const play = document.createElement('button'); play.className = 'vod-back'; play.textContent = '▶ Watch movie'; play.onclick = () => playVOD(d.tmdbId, null, null, d.title); box.appendChild(play);
-      }
-      setStatus('Ready to watch');
-    } catch (e) { setStatus(e.message, true); }
-  }
-
-  function episodes(show, season, box) {
-    box.querySelector('.vod-episodes')?.remove();
-    const wrap = document.createElement('div'); wrap.className = 'vod-episodes';
-    const s = (show.seasons || []).find(x => x.season === season);
-    for (let e = 1; e <= (s?.episodes || 0); e++) {
-      const b = document.createElement('button'); b.className = 'vod-episode'; b.innerHTML = `<b>Episode ${e}</b><small>Play with CineXtream</small>`; b.onclick = () => playVOD(show.tmdbId, season, e, `${show.title} · S${season}E${e}`); wrap.appendChild(b);
-    }
-    box.appendChild(wrap);
-  }
-
-  function playVOD(id, season, episode, title) {
-    const url = season ? `https://cinextream.net/api/embed/tv/${id}/${season}/${episode}` : `https://cinextream.net/api/embed/movie/${id}`;
-    const stage = document.querySelector('.video');
-    stage.innerHTML = `<iframe src="${url}" style="width:100%;height:100%;border:0" allow="autoplay; encrypted-media" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
-    $('title').textContent = title; setStatus('CineXtream player');
-  }
-
-  tabs.addEventListener('click', e => { const b = e.target.closest('.vod-tab'); if (b) setMode(b.dataset.mode); });
-  search.addEventListener('input', e => {
-    if (state.mode === 'live') return;
-    e.stopImmediatePropagation(); clearTimeout(state.timer); state.timer = setTimeout(() => { state.page = 1; loadVOD(true); }, 250);
-  }, true);
-  more.addEventListener('click', e => {
-    if (state.mode === 'live') return;
-    e.stopImmediatePropagation(); state.page += 1; loadVOD(false);
-  }, true);
-
-  // Prevent the original live renderer from responding to VOD search events.
-  window.bouyonLiveReload = () => {
-    if (state.mode !== 'live') return;
-    location.reload();
-  };
+  const tabs = document.createElement('div'); tabs.className='vod-tabs'; tabs.innerHTML='<button class="vod-tab active" data-mode="live">Live TV</button><button class="vod-tab" data-mode="movie">Movies</button><button class="vod-tab" data-mode="tv">TV Shows</button>'; brand.insertAdjacentElement('afterend',tabs);
+  const setStatus=(text,error=false)=>{const el=$('status');if(el){el.textContent=text;el.className='status'+(error?' error':'')}};
+  const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  function setMode(mode){state.mode=mode;document.querySelectorAll('.vod-tab').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));if(filters)filters.style.display=mode==='live'?'':'none';search.placeholder=mode==='live'?'Search channels…':mode==='tv'?'Search TV shows…':'Search movies…';search.value='';if(mode==='live'){more.hidden=false;list.classList.remove('vod-grid','vod-details');location.reload();return}state.type=mode;state.page=1;list.className='list vod-grid';list.replaceChildren();loadVOD(true)}
+  async function api(params){const r=await fetch('/api/vod?'+new URLSearchParams(params),{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'VOD unavailable');return d}
+  function card(item){const b=document.createElement('button');b.className='vod-card';b.innerHTML=`<img class="vod-poster" loading="lazy" src="${esc(item.poster)}" onerror="this.style.visibility='hidden'"><div class="vod-title">${esc(item.title)}</div><div class="vod-meta">${esc(item.year)}${item.rating?` • ${Number(item.rating).toFixed(1)}`:''}</div>`;b.onclick=()=>details(item);return b}
+  async function loadVOD(reset){try{const q=search.value.trim(),action=q?'search':'popular';setStatus(q?'Searching…':'Loading catalogue…');const d=await api({type:state.type,action,page:state.page,...(q?{q}:{})});state.totalPages=d.totalPages||1;count.textContent=`${Number(d.totalResults||d.results?.length||0).toLocaleString()} results`;if(reset)list.replaceChildren();(d.results||[]).forEach(x=>list.appendChild(card(x)));more.hidden=state.page>=state.totalPages||!(d.results||[]).length;setStatus(state.type==='tv'?'TV Shows • TMDB catalogue':'Movies • TMDB catalogue');if(!document.querySelector('.vod-attribution')){const a=document.createElement('div');a.className='vod-attribution';a.textContent='This product uses the TMDB API but is not endorsed or certified by TMDB.';list.parentElement.appendChild(a)}}catch(e){count.textContent='VOD unavailable';setStatus(e.message,true);more.hidden=true}}
+  async function details(item){try{const d=await api({type:item.type==='series'?'tv':'movie',action:'details',id:item.tmdbId});list.className='list';list.replaceChildren();more.hidden=true;const box=document.createElement('div');box.className='vod-details';box.innerHTML=`<button class="vod-back">← Back</button><img class="vod-poster" style="max-width:180px;margin-top:12px" src="${esc(d.poster)}"><h2>${esc(d.title)}</h2><div class="vod-meta">${esc(d.year)}${d.rating?` • ${Number(d.rating).toFixed(1)}/10`:''}</div><p>${esc(d.overview)}</p>`;list.appendChild(box);box.querySelector('.vod-back').onclick=()=>{list.className='list vod-grid';loadVOD(true)};if(d.type==='series'){const seasons=document.createElement('div');seasons.className='vod-seasons';(d.seasons||[]).forEach((s,i)=>{const b=document.createElement('button');b.className='vod-season'+(i===0?' active':'');b.textContent=s.name||`Season ${s.season}`;b.onclick=()=>{seasons.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');episodes(d,s.season,box)};seasons.appendChild(b)});box.appendChild(seasons);if(d.seasons?.length)episodes(d,d.seasons[0].season,box)}else{const play=document.createElement('button');play.className='vod-back';play.textContent='▶ Watch movie';play.onclick=()=>playVOD(d.tmdbId,null,null,d.title);box.appendChild(play)}setStatus('Ready to watch')}catch(e){setStatus(e.message,true)}}
+  function episodes(show,season,box){box.querySelector('.vod-episodes')?.remove();const wrap=document.createElement('div');wrap.className='vod-episodes';const s=(show.seasons||[]).find(x=>x.season===season);for(let e=1;e<=(s?.episodes||0);e++){const b=document.createElement('button');b.className='vod-episode';b.innerHTML=`<b>Episode ${e}</b><small>Play with CineXtream</small>`;b.onclick=()=>playVOD(show.tmdbId,season,e,`${show.title} · S${season}E${e}`);wrap.appendChild(b)}box.appendChild(wrap)}
+  function playVOD(id,season,episode,title){const url=season?`https://cinextream.net/api/embed/tv/${id}/${season}/${episode}`:`https://cinextream.net/api/embed/movie/${id}`;const stage=document.querySelector('.video');stage.innerHTML=`<iframe src="${url}" style="width:100%;height:100%;border:0" allow="autoplay; encrypted-media" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;$('title').textContent=title;setStatus('CineXtream player')}
+  tabs.addEventListener('click',e=>{const b=e.target.closest('.vod-tab');if(b)setMode(b.dataset.mode)});
+  search.addEventListener('input',e=>{if(state.mode==='live')return;e.stopImmediatePropagation();clearTimeout(state.timer);state.timer=setTimeout(()=>{state.page=1;loadVOD(true)},250)},true);
+  more.addEventListener('click',e=>{if(state.mode==='live')return;e.stopImmediatePropagation();state.page+=1;loadVOD(false)},true);
 })();
