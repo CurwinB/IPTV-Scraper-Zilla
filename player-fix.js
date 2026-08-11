@@ -8,10 +8,7 @@
     tv:(id,s=1,e=1)=>`${CINE}/api/embed/tv/${encodeURIComponent(id)}/${encodeURIComponent(s)}/${encodeURIComponent(e)}`,
     anime:(id,e=1)=>`${CINE}/api/embed/anime/lang/${encodeURIComponent(id)}/${encodeURIComponent(e)}`
   };
-  // index.html historically exposed cineUrl globally. Replace it at runtime so legacy
-  // Movie/TV controls cannot continue constructing .net URLs.
   window.cineUrl=(type,id,s=1,e=1)=>type==='tv'?window.BouyonTVCineXtream.tv(id,s,e):window.BouyonTVCineXtream.movie(id);
-
   const video=document.getElementById('video'),player=document.getElementById('player'),vod=document.getElementById('vod'),frame=document.getElementById('frame'),title=document.getElementById('title'),status=document.getElementById('status');
   if(!video||!player||!vod||!frame)return;
   let hls=null,sources=[],sourceIndex=0,channels=[];
@@ -24,4 +21,5 @@
   fetch('/api/catalog',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{channels=d?.channels||[];window.__bouyonChannels=channels}).catch(()=>{});
   document.addEventListener('click',e=>{const card=e.target.closest('.live-card');if(!card)return;const id=card.dataset.id,c=channels.find(x=>String(x.id)===String(id)||String(x.name)===String(id));if(!c)return;e.preventDefault();e.stopImmediatePropagation();playLive(c)},true);
   window.__bouyonPlayLive=playLive;
+  window.playLive=playLive;
 })();
