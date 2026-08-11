@@ -12,7 +12,7 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout BouyonTV
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -20,20 +20,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install IPTV API
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install iptv-api
+      - name: Install validator dependencies
+        run: python -m pip install --upgrade requests
 
-      - name: Generate validated playlist
-        run: |
-          mkdir -p data
-          python -m iptv_api --help || true
-          if command -v iptv-api >/dev/null 2>&1; then
-            iptv-api --help || true
-          fi
-
-      - name: Build BouyonTV catalogue from validated outputs
+      - name: Build validated catalogue
         run: python scripts/build_catalog.py
 
       - name: Commit catalogue
@@ -41,5 +31,5 @@ jobs:
           git config user.name 'bouyontv-bot'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add data/catalog.json
-          git diff --cached --quiet || git commit -m 'chore: update BouyonTV validated catalogue'
+          git diff --cached --quiet || git commit -m 'chore: refresh BouyonTV validated catalogue'
           git push
