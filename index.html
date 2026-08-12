@@ -10,9 +10,7 @@
 <script>
   // Bandwidth-heavy endpoints (live catalogue + HLS stream proxy) live on Railway,
   // not Vercel, to keep Fast Origin/Data Transfer off the Vercel bill.
-  // Leave empty until the Railway service is deployed — '' falls back to same-origin
-  // (the Vercel functions), so nothing breaks in the meantime.
-  window.BOUYONTV_API_BASE = window.BOUYONTV_API_BASE || '';
+  window.BOUYONTV_API_BASE = window.BOUYONTV_API_BASE || 'https://iptv-scraper-zilla-production.up.railway.app';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
 <style>
