@@ -1,0 +1,16 @@
+{
+  "name": "bouyontv-edge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "BouyonTV bandwidth-heavy endpoints (live channel catalogue + HLS stream proxy), split out from Vercel to keep Fast Origin/Data Transfer off the Vercel bill.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
