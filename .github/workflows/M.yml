@@ -5,13 +5,20 @@ on:
     - cron: '0 * * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: merge-m3u
+  cancel-in-progress: false
+
 jobs:
   merge-m3u:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Merge all M3U playlists
         run: |
@@ -43,13 +50,14 @@ jobs:
 
       - name: Commit and push merged playlist
         run: |
-          git config user.name "${{ secrets.GIT_U }}"
-          git config user.email "${{ secrets.GIT_E }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add combined-playlist.m3u
+
           if ! git diff --cached --quiet; then
             git commit -m "Auto-merged m3u playlists $(date -u +"%Y-%m-%d %H:%M UTC")"
             git pull --rebase --strategy-option=theirs origin main
-            git push origin main
+            git push origin HEAD:main
           else
             echo "No changes to commit"
           fi
