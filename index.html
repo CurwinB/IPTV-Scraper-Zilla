@@ -79,6 +79,7 @@
       history.pushState({path:path}, '', path);
     }
     applyMeta(meta, full);
+    if(!/^\/(movie|tv|anime|live)\//.test(path)) window.__bouyonLastBrowsePath = path;
   };
 })();
 </script>
@@ -193,7 +194,7 @@ function fill(id,label,vals){const el=$(id);if(el)el.innerHTML=`<option value=""
 async function tmdb(type,id='',season=''){const u=`/api/tmdb?type=${encodeURIComponent(type)}${id?'&id='+encodeURIComponent(id):''}${season?'&season='+encodeURIComponent(season):''}`;const r=await fetch(u,{cache:'no-store'});if(!r.ok){const d=await r.json().catch(()=>({}));throw Error(d.error||'TMDB request failed')}return r.json()}
 function clearPlayer(){if(state.hls){state.hls.destroy();state.hls=null}video.pause();video.removeAttribute('src');video.load();$('vod').style.display='none';$('frame').src='';video.style.display='block';$('details').hidden=true;$('details').innerHTML=''}
 function openPlayer(){ $('home').style.display='none';$('browse').style.display='none';$('player').classList.add('active') }
-function closePlayer(){clearPlayer();$('player').classList.remove('active');if(window.setRoute)window.setRoute('/');showMode(state.mode==='home'?'home':state.mode)}
+function closePlayer(){clearPlayer();$('player').classList.remove('active');const backPath=window.__bouyonLastBrowsePath||'/';const R=window.bouyonRouter;const route=window.bouyonParseRoute?window.bouyonParseRoute(backPath):{mode:'home'};if(route.mode==='browse'&&R&&R.showBrowse)R.showBrowse(route.browse);else if(R&&R.showHome)R.showHome();else showMode(state.mode==='home'?'home':state.mode)}
 function liveFilters(){const vals=k=>[...new Set(state.channels.map(c=>String(c[k]||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));fill('country','All countries',vals('country'));fill('language','All languages',vals('language'));fill('category','All categories',vals('category'))}
 function poster(x){return x.poster_path?IMG+x.poster_path:''}
 function card(x){const b=document.createElement('button');b.className='card';b.dataset.id=x.id;b.dataset.mode=x.media_type||'live';if(x.media_type==='live'){b.classList.add('live-card');b.innerHTML=`<img class="live-logo" loading="lazy" src="${esc(x.logo||'')}" onerror="this.style.visibility='hidden'"><div class="live-name">${esc(x.name)}</div><div class="live-meta">${esc(x.category||x.group||'Live TV')} · ${esc(x.language||x.country||'')}</div>`}else{const title=x.title||x.name||'Untitled',year=(x.release_date||x.first_air_date||'').slice(0,4);b.innerHTML=`<img class="card-poster" loading="lazy" src="${esc(poster(x))}" onerror="this.style.visibility='hidden'"><div class="card-title">${esc(title)}</div><div class="card-meta">${esc(year)} · ${x.media_type==='tv'?'Series':'Movie'}</div>`}return b}
