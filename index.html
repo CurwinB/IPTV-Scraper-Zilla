@@ -7,11 +7,80 @@
 <meta name="theme-color" content="#070707">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>BouyonTV</title>
+<title>BouyonTV — Live TV, Movies, TV Shows &amp; Anime</title>
+<meta name="description" content="Stream live TV channels, movies, TV shows and anime in one fast, clean interface. No signup required.">
+<link rel="canonical" href="https://www.bouyontyme.co.uk/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="BouyonTV">
+<meta property="og:title" content="BouyonTV — Live TV, Movies, TV Shows &amp; Anime">
+<meta property="og:description" content="Stream live TV channels, movies, TV shows and anime in one fast, clean interface. No signup required.">
+<meta property="og:url" content="https://www.bouyontyme.co.uk/">
+<meta property="og:image" content="">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BouyonTV — Live TV, Movies, TV Shows &amp; Anime">
+<meta name="twitter:description" content="Stream live TV channels, movies, TV shows and anime in one fast, clean interface. No signup required.">
+<meta name="twitter:image" content="">
 <script>
   // Bandwidth-heavy endpoints (live catalogue + HLS stream proxy) live on Railway,
   // not Vercel, to keep Fast Origin/Data Transfer off the Vercel bill.
   window.BOUYONTV_API_BASE = window.BOUYONTV_API_BASE || 'https://iptv-scraper-zilla-production-7b5b.up.railway.app';
+</script>
+<script>
+(function(){
+  var DEFAULT_TITLE = 'BouyonTV — Live TV, Movies, TV Shows & Anime';
+  var DEFAULT_DESC = "Stream live TV channels, movies, TV shows and anime in one fast, clean interface. No signup required.";
+  function parseRoute(pathname){
+    var p;
+    try{ p = decodeURIComponent(pathname); }catch(e){ p = pathname; }
+    p = p.replace(/\/+$/,'') || '/';
+    var m;
+    if(p==='/') return {mode:'home'};
+    if(p==='/live') return {mode:'browse', browse:'live'};
+    if(p==='/movies') return {mode:'browse', browse:'movie'};
+    if(p==='/tv-shows') return {mode:'browse', browse:'tv'};
+    if(p==='/anime') return {mode:'browse', browse:'anime'};
+    if((m = p.match(/^\/movie\/(\d+)/))) return {mode:'movie', id:m[1]};
+    if((m = p.match(/^\/tv\/(\d+)(?:\/[^/]+)?\/(\d+)\/(\d+)$/))) return {mode:'tv', id:m[1], season:m[2], episode:m[3]};
+    if((m = p.match(/^\/tv\/(\d+)$/))) return {mode:'tv', id:m[1], season:'1', episode:'1'};
+    if((m = p.match(/^\/anime\/(\d+)(?:\/[^/]+)?\/(\d+)$/))) return {mode:'anime', id:m[1], episode:m[2]};
+    if((m = p.match(/^\/anime\/(\d+)$/))) return {mode:'anime', id:m[1], episode:'1'};
+    if((m = p.match(/^\/live\/(.+)$/))) return {mode:'live', id:m[1]};
+    return {mode:'home'};
+  }
+  window.bouyonParseRoute = parseRoute;
+  window.BouyonRoute = parseRoute(location.pathname);
+  window.bouyonSlugify = function(s){
+    return String(s||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-+|-+$)/g,'').slice(0,60) || 'title';
+  };
+  function applyMeta(meta, url){
+    meta = meta || {};
+    var t = meta.title || DEFAULT_TITLE;
+    var d = (meta.description || DEFAULT_DESC).slice(0,160);
+    document.title = t;
+    var set = function(sel, attr, val){ var el = document.querySelector(sel); if(el) el.setAttribute(attr, val); };
+    set('meta[name="description"]','content', d);
+    set('meta[property="og:title"]','content', t);
+    set('meta[property="og:description"]','content', d);
+    set('meta[property="og:url"]','content', url);
+    set('link[rel="canonical"]','href', url);
+    set('meta[name="twitter:title"]','content', t);
+    set('meta[name="twitter:description"]','content', d);
+    if(meta.image){
+      set('meta[property="og:image"]','content', meta.image);
+      set('meta[name="twitter:image"]','content', meta.image);
+    }
+  }
+  window.setRoute = function(path, meta, opts){
+    opts = opts || {};
+    var full = location.origin + path;
+    if(opts.replace || location.pathname === path){
+      history.replaceState({path:path}, '', path);
+    } else {
+      history.pushState({path:path}, '', path);
+    }
+    applyMeta(meta, full);
+  };
+})();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
 <style>
@@ -124,7 +193,7 @@ function fill(id,label,vals){const el=$(id);if(el)el.innerHTML=`<option value=""
 async function tmdb(type,id='',season=''){const u=`/api/tmdb?type=${encodeURIComponent(type)}${id?'&id='+encodeURIComponent(id):''}${season?'&season='+encodeURIComponent(season):''}`;const r=await fetch(u,{cache:'no-store'});if(!r.ok){const d=await r.json().catch(()=>({}));throw Error(d.error||'TMDB request failed')}return r.json()}
 function clearPlayer(){if(state.hls){state.hls.destroy();state.hls=null}video.pause();video.removeAttribute('src');video.load();$('vod').style.display='none';$('frame').src='';video.style.display='block';$('details').hidden=true;$('details').innerHTML=''}
 function openPlayer(){ $('home').style.display='none';$('browse').style.display='none';$('player').classList.add('active') }
-function closePlayer(){clearPlayer();$('player').classList.remove('active');showMode(state.mode==='home'?'home':state.mode)}
+function closePlayer(){clearPlayer();$('player').classList.remove('active');if(window.setRoute)window.setRoute('/');showMode(state.mode==='home'?'home':state.mode)}
 function liveFilters(){const vals=k=>[...new Set(state.channels.map(c=>String(c[k]||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));fill('country','All countries',vals('country'));fill('language','All languages',vals('language'));fill('category','All categories',vals('category'))}
 function poster(x){return x.poster_path?IMG+x.poster_path:''}
 function card(x){const b=document.createElement('button');b.className='card';b.dataset.id=x.id;b.dataset.mode=x.media_type||'live';if(x.media_type==='live'){b.classList.add('live-card');b.innerHTML=`<img class="live-logo" loading="lazy" src="${esc(x.logo||'')}" onerror="this.style.visibility='hidden'"><div class="live-name">${esc(x.name)}</div><div class="live-meta">${esc(x.category||x.group||'Live TV')} · ${esc(x.language||x.country||'')}</div>`}else{const title=x.title||x.name||'Untitled',year=(x.release_date||x.first_air_date||'').slice(0,4);b.innerHTML=`<img class="card-poster" loading="lazy" src="${esc(poster(x))}" onerror="this.style.visibility='hidden'"><div class="card-title">${esc(title)}</div><div class="card-meta">${esc(year)} · ${x.media_type==='tv'?'Series':'Movie'}</div>`}return b}
@@ -134,12 +203,12 @@ function filterBrowse(){const q=$('search').value.toLowerCase().trim();if(state.
 async function browseVod(mode){state.mode=mode;$('browseTitle').textContent=mode==='movie'?'Movies':'TV Shows';$('filters').style.display='none';$('grid').innerHTML='<div class="empty">Loading library…</div>';try{const data=await tmdb(mode==='movie'?'popular-movies':'popular-tv');state.items=(data.results||[]).map(x=>({...x,media_type:mode}));filterBrowse()}catch(e){$('grid').innerHTML=`<div class="empty">${esc(e.message)}</div>`;$('count').textContent=''}}
 function browseLive(){state.mode='live';$('browseTitle').textContent='Live TV';$('filters').style.display='flex';liveFilters();filterBrowse()}
 function showMode(mode){state.mode=mode;$('home').style.display=mode==='home'?'block':'none';$('browse').style.display=mode==='home'?'none':'block';if(mode==='live')browseLive();if(mode==='movie'||mode==='tv')browseVod(mode)}
-async function playLive(c){openPlayer();clearPlayer();state.sources=(c.sources||[]).map(s=>typeof s==='string'?s:s.url).filter(Boolean);if(c.url&&!state.sources.includes(c.url))state.sources.unshift(c.url);state.si=0;$('title').textContent=c.name;status('Finding a playable source…');await trySource()}
+async function playLive(c){openPlayer();clearPlayer();state.sources=(c.sources||[]).map(s=>typeof s==='string'?s:s.url).filter(Boolean);if(c.url&&!state.sources.includes(c.url))state.sources.unshift(c.url);state.si=0;$('title').textContent=c.name;status('Finding a playable source…');if(window.setRoute){const cid=String(c.id||c.name||'');window.setRoute(`/live/${encodeURIComponent(cid)}`,{title:`${c.name} — Live TV — BouyonTV`,description:`Watch ${c.name} live${c.category?' — '+c.category:''} on BouyonTV.`,image:c.logo||''})}await trySource()}
 async function verify(url){try{const r=await fetch(`/api/verify?url=${encodeURIComponent(url)}`,{cache:'no-store'});if(!r.ok)return null;return r.json()}catch{return null}}
 async function trySource(){if(state.si>=state.sources.length){status('No playable source found',true);return}const original=state.sources[state.si++];status(`Checking source ${state.si}/${state.sources.length}…`);const c=await verify(original);if(!c?.ok)return setTimeout(trySource,50);const src=`${API_BASE}/api/stream?url=${encodeURIComponent(original)}`;if(window.Hls&&Hls.isSupported()){state.hls=new Hls({enableWorker:true,backBufferLength:20,maxBufferLength:20});state.hls.attachMedia(video);state.hls.on(Hls.Events.MEDIA_ATTACHED,()=>state.hls.loadSource(src));state.hls.on(Hls.Events.MANIFEST_PARSED,()=>video.play().then(()=>status('Playing')).catch(()=>status('Ready — press play')));state.hls.on(Hls.Events.ERROR,(_,d)=>{if(!d.fatal)return;state.hls.destroy();state.hls=null;setTimeout(trySource,50)});return}if(video.canPlayType('application/vnd.apple.mpegurl')){video.src=src;video.play().catch(()=>{});status('Playing');return}status('HLS is not supported in this browser',true)}
 function cineUrl(type,id,s,e){return type==='tv'?`https://cinextream.cc/api/embed/tv/${id}/${s}/${e}`:`https://cinextream.cc/api/embed/movie/${id}`}
 function showDetails(x,episodes=[]){const title=x.title||x.name,year=(x.release_date||x.first_air_date||'').slice(0,4);$('details').hidden=false;$('details').innerHTML=`<h2>${esc(title)}${year?' ('+esc(year)+')':''}</h2><p>${esc(x.overview||'')}</p>${episodes.length?'<div class="episodes">'+episodes.map(e=>`<button class="episode${e.episode_number===state.episode?' active':''}" data-ep="${e.episode_number}">Episode ${e.episode_number}</button>`).join('')+'</div>':''}`}
-async function playVod(x){openPlayer();clearPlayer();state.tmdb=x.id;state.season=1;state.episode=1;$('title').textContent=x.title||x.name;status('Loading player…');$('video').style.display='none';$('vod').style.display='block';$('frame').src=cineUrl(x.media_type,x.id,1,1);if(x.media_type==='tv'){try{const s=await tmdb('season',x.id,1);showDetails(x,s.episodes||[])}catch{showDetails(x)}}else showDetails(x)}
+async function playVod(x){openPlayer();clearPlayer();state.tmdb=x.id;state.season=1;state.episode=1;$('title').textContent=x.title||x.name;status('Loading player…');$('video').style.display='none';$('vod').style.display='block';$('frame').src=cineUrl(x.media_type,x.id,1,1);if(window.setRoute){const name=x.title||x.name||'Untitled',year=(x.release_date||x.first_air_date||'').slice(0,4),slug=window.bouyonSlugify(name),path=x.media_type==='tv'?`/tv/${x.id}/${slug}/1/1`:`/movie/${x.id}/${slug}`;window.setRoute(path,{title:`${name}${year?' ('+year+')':''} — BouyonTV`,description:x.overview||'',image:x.poster_path?IMG+x.poster_path:''})}if(x.media_type==='tv'){try{const s=await tmdb('season',x.id,1);showDetails(x,s.episodes||[])}catch{showDetails(x)}}else showDetails(x)}
 async function initHome(){try{const [m,t]=await Promise.all([tmdb('popular-movies'),tmdb('popular-tv')]);const movies=(m.results||[]).map(x=>({...x,media_type:'movie'}));const tv=(t.results||[]).map(x=>({...x,media_type:'tv'}));renderRail('movieRail',movies.slice(0,12));renderRail('tvRail',tv.slice(0,12));const hero=movies[0];if(hero){$('heroTitle').textContent=hero.title||'Featured';$('heroText').textContent=hero.overview||'Discover something worth watching.';$('heroBg').style.backgroundImage=`url('${poster(hero)}')`;$('heroWatch').onclick=()=>playVod(hero)}if(state.channels.length)renderRail('liveRail',state.channels.slice(0,12).map(x=>({...x,media_type:'live'})))}catch{}}
 function clickCard(e){const b=e.target.closest('.card');if(!b)return;const id=b.dataset.id,mode=b.dataset.mode;if(mode==='live'){const c=state.channels.find(x=>String(x.id)===String(id)||String(x.name)===String(id));if(c)playLive(c)}else{const x=state.items.find(x=>String(x.id)===String(id));if(x)playVod(x)}}
 $('content').addEventListener('click',clickCard);$('movieRail').addEventListener('click',e=>{const b=e.target.closest('.card');if(b){const x=[...$('movieRail').children].find(y=>y===b);const id=b.dataset.id;const all=window.homeMovies||[];const item=all.find(x=>String(x.id)===String(id));if(item)playVod(item)}});$('tvRail').addEventListener('click',e=>{const b=e.target.closest('.card');if(b){const id=b.dataset.id;const item=(window.homeTv||[]).find(x=>String(x.id)===String(id));if(item)playVod(item)}});$('liveRail').addEventListener('click',e=>{const b=e.target.closest('.card');if(b){const item=state.channels.find(x=>String(x.id)===String(b.dataset.id));if(item)playLive(item)}});
@@ -147,5 +216,6 @@ function nav(mode){document.querySelectorAll('[data-mode]').forEach(b=>b.classLi
 document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>nav(b.dataset.mode));$('heroBrowse').onclick=()=>nav('movie');$('back').onclick=closePlayer;$('full').onclick=async()=>{const el=$('.player-stage');try{if(document.fullscreenElement)await document.exitFullscreen();else await el.requestFullscreen()}catch{}};$('details').onclick=e=>{const b=e.target.closest('.episode');if(!b)return;state.episode=Number(b.dataset.ep);$('frame').src=cineUrl('tv',state.tmdb,state.season,state.episode);document.querySelectorAll('.episode').forEach(x=>x.classList.remove('active'));b.classList.add('active');status(`Playing Season ${state.season}, Episode ${state.episode}`)};window.addEventListener('message',e=>{let d=e.data;try{if(typeof d==='string')d=JSON.parse(d)}catch{return}if(!d||!d.event)return;if(d.event==='player_ready')status('Player ready');if(d.event==='player_error')status(`Player error: ${d.reason||'stream error'}`,true);if(d.event==='VIDEO_ENDED'&&state.tmdb){const next=Number(d.episode||state.episode)+1;state.episode=next;$('frame').src=cineUrl('tv',state.tmdb,Number(d.season||state.season),next);status(`Next episode: S${d.season||state.season}E${next}`)}});video.addEventListener('error',()=>{if(state.si<state.sources.length)trySource()});
 (async function(){try{const r=await fetch(`${API_BASE}/api/catalog`,{cache:'no-store'});if(!r.ok)throw Error('Verified live catalogue unavailable');const d=await r.json();state.channels=d.channels||[];liveFilters();window.homeMovies=[];window.homeTv=[];const [m,t]=await Promise.all([tmdb('popular-movies'),tmdb('popular-tv')]);window.homeMovies=(m.results||[]).map(x=>({...x,media_type:'movie'}));window.homeTv=(t.results||[]).map(x=>({...x,media_type:'tv'}));renderRail('movieRail',window.homeMovies.slice(0,12));renderRail('tvRail',window.homeTv.slice(0,12));renderRail('liveRail',state.channels.slice(0,12).map(x=>({...x,media_type:'live'})));const hero=window.homeMovies[0];if(hero){$('heroTitle').textContent=hero.title||'Featured';$('heroText').textContent=hero.overview||'Discover something worth watching.';$('heroBg').style.backgroundImage=`url('${poster(hero)}')`;$('heroWatch').onclick=()=>playVod(hero)}}catch(e){$('heroTitle').textContent='Welcome to BouyonTV';$('heroText').textContent=e.message}})();
 </script>
-<script src="/vod-ui.js"></script></body>
+<script src="/vod-ui.js"></script>
+<script src="/router.js"></script></body>
 </html>
