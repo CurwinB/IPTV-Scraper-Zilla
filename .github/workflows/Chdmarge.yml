@@ -1,7 +1,0 @@
-name: Merge CricHD Playlists (disabled)
-
-on:
-  workflow_dispatch:
-
-# This legacy workflow is intentionally disabled.
-# The active playlist pipeline is handled by M.yml.
